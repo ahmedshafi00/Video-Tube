@@ -1,0 +1,563 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex, nofollow">
+  <title>TeleVid Admin</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="stylesheet" href="style.css">
+  <!-- Firebase compat -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+  <style>
+    /* ── Admin-only extra styles ─────────────────────────────── */
+    body { background: var(--bg-primary); }
+    .admin-layout { display: flex; min-height: 100vh; }
+    .sidebar-logo-row { display:flex;align-items:center;gap:10px;padding:20px;border-bottom:1px solid var(--border);margin-bottom:8px; }
+    .sidebar-logo-text { font-family:var(--font-display);font-size:20px;font-weight:700;color:var(--accent); }
+    .sidebar-user { padding:12px 20px;font-size:12px;color:var(--text-muted);border-top:1px solid var(--border);margin-top:auto; }
+    .badge { display:inline-block;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600; }
+    .badge-success { background:rgba(104,211,145,.15);color:var(--success); }
+    .badge-danger  { background:rgba(252,129,129,.15);color:var(--danger); }
+    .search-admin  { display:flex;gap:10px;margin-bottom:16px; }
+    .search-admin input { max-width:320px; }
+    .thumb-preview { width:120px;height:68px;object-fit:cover;border-radius:6px;border:1px solid var(--border); }
+    .page-actions { display:flex;gap:8px;align-items:center;flex-wrap:wrap; }
+    .tab-bar { display:flex;gap:4px;border-bottom:1px solid var(--border);margin-bottom:20px; }
+    .tab { padding:10px 18px;font-size:13px;font-weight:600;color:var(--text-muted);cursor:pointer;border-bottom:2px solid transparent;transition:all .2s; }
+    .tab.active { color:var(--accent);border-bottom-color:var(--accent); }
+    .section { display:none; } .section.active { display:block; }
+    .cat-chip { display:inline-flex;align-items:center;gap:6px;padding:6px 12px;background:var(--bg-glass);border:1px solid var(--border);border-radius:20px;font-size:13px;margin:4px; }
+    .cat-chip button { color:var(--danger);font-size:14px;line-height:1;cursor:pointer;background:none;border:none; }
+    /* Pagination */
+    .pagination { display:flex;gap:8px;justify-content:center;margin-top:16px; }
+    .page-btn { padding:6px 12px;border:1px solid var(--border);border-radius:6px;background:var(--bg-card);color:var(--text-secondary);cursor:pointer;font-size:13px; }
+    .page-btn:hover,.page-btn.active { background:var(--accent);color:#0a0a0f;border-color:var(--accent); }
+    /* Mobile sidebar */
+    .mobile-topbar { display:none;align-items:center;gap:12px;padding:12px 16px;background:var(--bg-secondary);border-bottom:1px solid var(--border); }
+    @media(max-width:768px){
+      .admin-sidebar{display:none}
+      .admin-main{margin-left:0!important}
+      .mobile-topbar{display:flex}
+      .stats-grid{grid-template-columns:repeat(2,1fr)}
+      .data-table{font-size:12px}
+      .data-table th:nth-child(3),.data-table td:nth-child(3){display:none}
+    }
+  </style>
+</head>
+<body>
+
+<!-- ── Login Screen ──────────────────────────────────────────── -->
+<div id="login-screen" class="login-screen">
+  <div style="font-family:var(--font-display);font-size:36px;font-weight:700;color:var(--accent)">TeleVid</div>
+  <div class="login-card">
+    <div class="login-title">Admin Login</div>
+    <div class="form-group">
+      <label class="form-label">Email</label>
+      <input type="email" id="admin-email" placeholder="admin@example.com">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Password</label>
+      <input type="password" id="admin-pass" placeholder="••••••••">
+    </div>
+    <div id="login-error" style="color:var(--danger);font-size:13px;min-height:18px;margin-bottom:8px"></div>
+    <button class="btn btn-primary btn-full" id="btn-admin-login">Sign In</button>
+  </div>
+</div>
+
+<!-- ── Admin App ─────────────────────────────────────────────── -->
+<div id="admin-app" class="hidden">
+
+  <!-- Mobile topbar -->
+  <div class="mobile-topbar">
+    <span style="font-family:var(--font-display);font-size:18px;font-weight:700;color:var(--accent)">TeleVid Admin</span>
+    <div style="margin-left:auto;display:flex;gap:8px">
+      <button class="btn btn-glass btn-sm" onclick="showTab('add-video')">+ Add</button>
+      <button class="btn btn-danger btn-sm" id="m-logout">Logout</button>
+    </div>
+  </div>
+
+  <div class="admin-layout">
+
+    <!-- Sidebar -->
+    <aside class="admin-sidebar">
+      <div class="sidebar-logo-row">
+        <svg width="28" height="28" viewBox="0 0 28 28" fill="none"><rect width="28" height="28" rx="8" fill="#63b3ed" fill-opacity=".15"/><path d="M10 8l12 6-12 6V8z" fill="#63b3ed"/></svg>
+        <span class="sidebar-logo-text">TeleVid</span>
+      </div>
+
+      <div class="sidebar-item active" onclick="showTab('dashboard')" data-tab="dashboard">
+        📊 Dashboard
+      </div>
+      <div class="sidebar-item" onclick="showTab('videos')" data-tab="videos">
+        🎬 Videos
+      </div>
+      <div class="sidebar-item" onclick="showTab('add-video')" data-tab="add-video">
+        ➕ Add Video
+      </div>
+      <div class="sidebar-item" onclick="showTab('categories')" data-tab="categories">
+        🗂️ Categories
+      </div>
+      <div class="sidebar-item" onclick="showTab('users')" data-tab="users">
+        👥 Users
+      </div>
+
+      <div class="sidebar-user" id="sidebar-user-info">
+        <div style="font-size:13px;font-weight:600" id="admin-display-name">Admin</div>
+        <button class="btn btn-danger btn-sm btn-full mt-8" id="btn-logout">Logout</button>
+      </div>
+    </aside>
+
+    <!-- Main content -->
+    <main class="admin-main">
+
+      <!-- ── DASHBOARD ───────────────────────────────────────── -->
+      <section id="tab-dashboard" class="section active">
+        <div class="admin-header">
+          <div class="admin-title">📊 Dashboard</div>
+          <button class="btn btn-primary btn-sm" onclick="loadDashboard()">↺ Refresh</button>
+        </div>
+        <div class="stats-grid" id="stats-grid">
+          <div class="stat-card"><div class="stat-value" id="s-videos">—</div><div class="stat-label">Total Videos</div></div>
+          <div class="stat-card"><div class="stat-value" id="s-users">—</div><div class="stat-label">Total Users</div></div>
+          <div class="stat-card"><div class="stat-value" id="s-views">—</div><div class="stat-label">Total Views</div></div>
+          <div class="stat-card"><div class="stat-value" id="s-cats">—</div><div class="stat-label">Categories</div></div>
+        </div>
+        <div class="section-header"><span class="section-title">Recent Videos</span></div>
+        <div id="recent-videos-table"></div>
+      </section>
+
+      <!-- ── VIDEOS LIST ─────────────────────────────────────── -->
+      <section id="tab-videos" class="section">
+        <div class="admin-header">
+          <div class="admin-title">🎬 Videos</div>
+          <button class="btn btn-primary btn-sm" onclick="showTab('add-video')">+ Add Video</button>
+        </div>
+        <div class="search-admin">
+          <input type="search" id="vid-search" placeholder="Search videos…">
+          <button class="btn btn-glass btn-sm" onclick="loadVideosList()">Search</button>
+        </div>
+        <div id="videos-table-wrap"></div>
+        <div class="pagination" id="vid-pagination"></div>
+      </section>
+
+      <!-- ── ADD / EDIT VIDEO ────────────────────────────────── -->
+      <section id="tab-add-video" class="section">
+        <div class="admin-header">
+          <div class="admin-title" id="form-title">➕ Add Video</div>
+        </div>
+        <div class="admin-form">
+          <input type="hidden" id="edit-video-id">
+          <div class="form-grid">
+            <div class="form-group">
+              <label class="form-label">Title *</label>
+              <input type="text" id="v-title" placeholder="Video title" maxlength="120">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Category *</label>
+              <select id="v-category">
+                <option value="">Select category…</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Embed URL * <span style="color:var(--text-muted);font-size:11px">(YouTube or direct MP4)</span></label>
+            <input type="url" id="v-embed" placeholder="https://youtu.be/… or https://example.com/video.mp4">
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Thumbnail URL *</label>
+            <input type="url" id="v-thumb" placeholder="https://…/thumbnail.jpg"
+              oninput="document.getElementById('thumb-preview').src=this.value">
+            <img id="thumb-preview" class="thumb-preview mt-8"
+              src="https://via.placeholder.com/120x68/111118/63b3ed?text=Preview" alt="Preview">
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Description</label>
+            <textarea id="v-desc" rows="4" placeholder="Video description…" style="resize:vertical"></textarea>
+          </div>
+
+          <div class="form-grid">
+            <div class="form-group">
+              <label class="form-label">Duration <span style="color:var(--text-muted);font-size:11px">(e.g. 12:34)</span></label>
+              <input type="text" id="v-duration" placeholder="12:34" maxlength="8">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Tags <span style="color:var(--text-muted);font-size:11px">(comma separated)</span></label>
+              <input type="text" id="v-tags" placeholder="action, drama, comedy">
+            </div>
+          </div>
+
+          <div id="form-error" style="color:var(--danger);font-size:13px;min-height:18px;margin-bottom:10px"></div>
+          <div style="display:flex;gap:10px;flex-wrap:wrap">
+            <button class="btn btn-primary" id="btn-save-video">💾 Save Video</button>
+            <button class="btn btn-glass" onclick="resetVideoForm()">✕ Clear</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── CATEGORIES ──────────────────────────────────────── -->
+      <section id="tab-categories" class="section">
+        <div class="admin-header">
+          <div class="admin-title">🗂️ Categories</div>
+        </div>
+        <div class="admin-form" style="margin-bottom:24px;max-width:400px">
+          <div class="form-grid" style="grid-template-columns:2fr 1fr">
+            <div class="form-group">
+              <label class="form-label">Category Name</label>
+              <input type="text" id="cat-name" placeholder="e.g. Gaming">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Icon (emoji)</label>
+              <input type="text" id="cat-icon" placeholder="🎮" maxlength="4">
+            </div>
+          </div>
+          <button class="btn btn-primary btn-sm" id="btn-add-cat">+ Add Category</button>
+        </div>
+        <div id="categories-list"></div>
+      </section>
+
+      <!-- ── USERS ───────────────────────────────────────────── -->
+      <section id="tab-users" class="section">
+        <div class="admin-header">
+          <div class="admin-title">👥 Users</div>
+        </div>
+        <div id="users-table-wrap"></div>
+      </section>
+
+    </main>
+  </div>
+</div>
+
+<!-- ── Edit Video Modal ──────────────────────────────────────── -->
+<div class="modal-backdrop hidden" id="edit-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title">Edit Video</span>
+      <span class="modal-close" onclick="closeEditModal()">✕</span>
+    </div>
+    <div id="edit-modal-body"></div>
+  </div>
+</div>
+
+<!-- ── Toast ─────────────────────────────────────────────────── -->
+<div id="toast-container"></div>
+
+<!-- ── Scripts ───────────────────────────────────────────────── -->
+<script src="firebase.js"></script>
+<script>
+/* ============================================================
+   ADMIN APP LOGIC
+   ============================================================ */
+
+let ADMIN_USER = null;
+let vidLastDoc = null;
+let vidPage    = 1;
+const VID_PER_PAGE = 15;
+
+/* ── Auth ─────────────────────────────────────────────────── */
+auth.onAuthStateChanged(async (user) => {
+  if (!user) { showLoginScreen(); return; }
+  const snap = await db.collection("users").doc(user.uid).get().catch(()=>null);
+  if (!snap?.exists || snap.data().role !== "admin") {
+    // Not admin — check if email-based admin
+    const snap2 = await db.collection("admins").doc(user.uid).get().catch(()=>null);
+    if (!snap2?.exists) { await auth.signOut(); showLoginScreen(); return; }
+  }
+  ADMIN_USER = user;
+  document.getElementById("login-screen").classList.add("hidden");
+  document.getElementById("admin-app").classList.remove("hidden");
+  document.getElementById("admin-display-name").textContent = user.email;
+  loadDashboard();
+  loadCategoriesSelect();
+});
+
+document.getElementById("btn-admin-login").addEventListener("click", async () => {
+  const email = document.getElementById("admin-email").value.trim();
+  const pass  = document.getElementById("admin-pass").value;
+  const errEl = document.getElementById("login-error");
+  errEl.textContent = "";
+  try {
+    await auth.signInWithEmailAndPassword(email, pass);
+  } catch (e) {
+    errEl.textContent = e.message;
+  }
+});
+
+document.getElementById("btn-logout").addEventListener("click", () => auth.signOut());
+document.getElementById("m-logout")?.addEventListener("click", () => auth.signOut());
+
+function showLoginScreen() {
+  document.getElementById("login-screen").classList.remove("hidden");
+  document.getElementById("admin-app").classList.add("hidden");
+}
+
+/* ── Tab switching ────────────────────────────────────────── */
+function showTab(tab) {
+  document.querySelectorAll(".section").forEach(s => s.classList.remove("active"));
+  document.querySelectorAll(".sidebar-item").forEach(s => s.classList.remove("active"));
+  document.getElementById("tab-" + tab)?.classList.add("active");
+  document.querySelector(`[data-tab="${tab}"]`)?.classList.add("active");
+
+  if (tab === "videos")     loadVideosList();
+  if (tab === "categories") loadCategories();
+  if (tab === "users")      loadUsers();
+  if (tab === "dashboard")  loadDashboard();
+}
+
+/* ── Dashboard ────────────────────────────────────────────── */
+async function loadDashboard() {
+  const stats = await getGlobalStats();
+  document.getElementById("s-videos").textContent = fmtNum(stats.totalVideos || 0);
+  document.getElementById("s-users").textContent  = fmtNum(stats.totalUsers  || 0);
+  document.getElementById("s-views").textContent  = fmtNum(stats.totalViews  || 0);
+
+  const cats = await getCategories();
+  document.getElementById("s-cats").textContent   = cats.length;
+
+  const { videos } = await getAllVideosAdmin({ limit: 5 });
+  const wrap = document.getElementById("recent-videos-table");
+  wrap.innerHTML = buildVideosTable(videos, true);
+}
+
+/* ── Videos List ──────────────────────────────────────────── */
+async function loadVideosList(page = 1) {
+  vidPage = page;
+  const wrap = document.getElementById("videos-table-wrap");
+  wrap.innerHTML = `<p class="text-muted">Loading…</p>`;
+
+  const q     = document.getElementById("vid-search")?.value.trim();
+  let videos;
+
+  if (q && q.length > 1) {
+    videos = await searchVideos(q);
+  } else {
+    const result = await getAllVideosAdmin({ limit: VID_PER_PAGE * page });
+    videos = result.videos;
+  }
+
+  wrap.innerHTML = buildVideosTable(videos);
+  buildPagination(videos.length);
+}
+
+function buildVideosTable(videos, mini = false) {
+  if (videos.length === 0) return `<p class="text-muted">No videos found.</p>`;
+  return `
+  <div style="overflow-x:auto">
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th>Thumbnail</th>
+        <th>Title</th>
+        <th>Category</th>
+        <th>Views</th>
+        <th>Created</th>
+        ${mini ? "" : "<th>Actions</th>"}
+      </tr>
+    </thead>
+    <tbody>
+      ${videos.map(v => `
+        <tr>
+          <td><img class="thumb-preview" src="${esc(v.thumbUrl)}" alt="" onerror="this.src='https://via.placeholder.com/120x68/111118/63b3ed?text=No+Image'"></td>
+          <td style="max-width:200px"><div class="truncate" title="${esc(v.title)}">${esc(v.title)}</div></td>
+          <td><span class="badge badge-success">${esc(v.category||"—")}</span></td>
+          <td>${fmtNum(v.views||0)}</td>
+          <td style="white-space:nowrap">${v.createdAt?.toDate ? fmtDate(v.createdAt.toDate()) : "—"}</td>
+          ${mini ? "" : `
+          <td>
+            <div style="display:flex;gap:6px">
+              <button class="btn btn-glass btn-sm" onclick="editVideo('${v.id}')">✏️ Edit</button>
+              <button class="btn btn-danger btn-sm" onclick="confirmDelete('${v.id}','${esc(v.title)}')">🗑️</button>
+            </div>
+          </td>`}
+        </tr>`).join("")}
+    </tbody>
+  </table>
+  </div>`;
+}
+
+function buildPagination(count) {
+  const pg = document.getElementById("vid-pagination");
+  if (!pg) return;
+  const pages = Math.ceil(count / VID_PER_PAGE);
+  if (pages <= 1) { pg.innerHTML = ""; return; }
+  pg.innerHTML = Array.from({length: pages}, (_, i) =>
+    `<button class="page-btn${i+1===vidPage?" active":""}" onclick="loadVideosList(${i+1})">${i+1}</button>`
+  ).join("");
+}
+
+/* ── Add / Edit Video ─────────────────────────────────────── */
+async function loadCategoriesSelect() {
+  const cats = await getCategories().catch(()=>[]);
+  const sel  = document.getElementById("v-category");
+  if (!sel) return;
+  sel.innerHTML = `<option value="">Select category…</option>` +
+    cats.map(c => `<option value="${esc(c.name)}">${c.icon||""} ${esc(c.name)}</option>`).join("");
+}
+
+document.getElementById("btn-save-video").addEventListener("click", async () => {
+  const errEl   = document.getElementById("form-error");
+  errEl.textContent = "";
+  const editId  = document.getElementById("edit-video-id").value;
+  const title   = document.getElementById("v-title").value.trim();
+  const embedUrl= document.getElementById("v-embed").value.trim();
+  const thumbUrl= document.getElementById("v-thumb").value.trim();
+  const category= document.getElementById("v-category").value;
+  const desc    = document.getElementById("v-desc").value.trim();
+  const duration= document.getElementById("v-duration").value.trim();
+  const tagsRaw = document.getElementById("v-tags").value.trim();
+
+  if (!title || !embedUrl || !thumbUrl || !category) {
+    errEl.textContent = "Title, Embed URL, Thumbnail, and Category are required.";
+    return;
+  }
+
+  const tags = tagsRaw ? tagsRaw.split(",").map(t=>t.trim()).filter(Boolean) : [];
+  const data = { title, embedUrl, thumbUrl, category, description: desc, duration, tags, publishedBy: ADMIN_USER.uid };
+
+  try {
+    if (editId) {
+      await updateVideo(editId, data);
+      showAdminToast("Video updated! ✅", "success");
+      resetVideoForm();
+      showTab("videos");
+    } else {
+      await addVideo(data);
+      showAdminToast("Video added! 🎉", "success");
+      resetVideoForm();
+    }
+  } catch (e) {
+    errEl.textContent = e.message;
+  }
+});
+
+async function editVideo(videoId) {
+  const video = await getVideo(videoId);
+  document.getElementById("form-title").textContent = "✏️ Edit Video";
+  document.getElementById("edit-video-id").value = video.id;
+  document.getElementById("v-title").value    = video.title || "";
+  document.getElementById("v-embed").value    = video.embedUrl || "";
+  document.getElementById("v-thumb").value    = video.thumbUrl || "";
+  document.getElementById("thumb-preview").src= video.thumbUrl || "";
+  document.getElementById("v-category").value = video.category || "";
+  document.getElementById("v-desc").value     = video.description || "";
+  document.getElementById("v-duration").value = video.duration || "";
+  document.getElementById("v-tags").value     = (video.tags||[]).join(", ");
+  showTab("add-video");
+}
+
+function resetVideoForm() {
+  document.getElementById("form-title").textContent = "➕ Add Video";
+  document.getElementById("edit-video-id").value = "";
+  ["v-title","v-embed","v-thumb","v-category","v-desc","v-duration","v-tags"].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = "";
+  });
+  document.getElementById("thumb-preview").src = "https://via.placeholder.com/120x68/111118/63b3ed?text=Preview";
+  document.getElementById("form-error").textContent = "";
+}
+
+async function confirmDelete(videoId, title) {
+  if (!confirm(`Delete video "${title}"?\nThis cannot be undone.`)) return;
+  await deleteVideo(videoId);
+  showAdminToast("Video deleted.", "success");
+  loadVideosList();
+}
+
+/* ── Categories ───────────────────────────────────────────── */
+async function loadCategories() {
+  const cats = await getCategories();
+  const wrap = document.getElementById("categories-list");
+  wrap.innerHTML = cats.length === 0
+    ? `<p class="text-muted">No categories yet.</p>`
+    : cats.map(c => `
+      <span class="cat-chip">
+        ${c.icon||""} ${esc(c.name)}
+        <button onclick="deleteCategory('${c.id}')">✕</button>
+      </span>`).join("");
+}
+
+document.getElementById("btn-add-cat").addEventListener("click", async () => {
+  const name = document.getElementById("cat-name").value.trim();
+  const icon = document.getElementById("cat-icon").value.trim();
+  if (!name) return;
+  const slug  = name.toLowerCase().replace(/\s+/g,"-");
+  const cats  = await getCategories();
+  await addCategory({ name, slug, icon, order: cats.length + 1 });
+  document.getElementById("cat-name").value = "";
+  document.getElementById("cat-icon").value = "";
+  showAdminToast("Category added!", "success");
+  loadCategories();
+  loadCategoriesSelect();
+});
+
+async function deleteCategory(catId) {
+  if (!confirm("Delete this category?")) return;
+  await db.collection("categories").doc(catId).delete();
+  showAdminToast("Deleted.", "success");
+  loadCategories();
+}
+
+/* ── Users ────────────────────────────────────────────────── */
+async function loadUsers() {
+  const snap = await db.collection("users").orderBy("createdAt","desc").limit(50).get().catch(()=>null);
+  const wrap = document.getElementById("users-table-wrap");
+  if (!snap || snap.empty) { wrap.innerHTML = `<p class="text-muted">No users found.</p>`; return; }
+  const users = snap.docs.map(d=>({id:d.id,...d.data()}));
+  wrap.innerHTML = `
+  <div style="overflow-x:auto">
+  <table class="data-table">
+    <thead><tr><th>Name</th><th>Username</th><th>TG ID</th><th>Role</th><th>Actions</th></tr></thead>
+    <tbody>
+    ${users.map(u=>`
+      <tr>
+        <td>${esc(u.firstName||"—")}</td>
+        <td>${u.username ? `@${esc(u.username)}` : "—"}</td>
+        <td>${esc(u.tgId||u.id)}</td>
+        <td><span class="badge ${u.role==='admin'?'badge-danger':'badge-success'}">${esc(u.role||'user')}</span></td>
+        <td>
+          ${u.role!=='admin'
+            ? `<button class="btn btn-glass btn-sm" onclick="makeAdmin('${u.id}')">Make Admin</button>`
+            : `<button class="btn btn-danger btn-sm" onclick="removeAdmin('${u.id}')">Remove Admin</button>`}
+        </td>
+      </tr>`).join("")}
+    </tbody>
+  </table>
+  </div>`;
+}
+
+async function makeAdmin(uid) {
+  if (!confirm("Grant admin role to this user?")) return;
+  await db.collection("users").doc(uid).update({ role: "admin" });
+  showAdminToast("Admin role granted.", "success");
+  loadUsers();
+}
+
+async function removeAdmin(uid) {
+  if (!confirm("Remove admin role?")) return;
+  await db.collection("users").doc(uid).update({ role: "user" });
+  showAdminToast("Admin role removed.", "success");
+  loadUsers();
+}
+
+/* ── Utilities ────────────────────────────────────────────── */
+function fmtNum(n=0){if(n>=1e6)return(n/1e6).toFixed(1)+'M';if(n>=1e3)return(n/1e3).toFixed(1)+'K';return String(n);}
+function fmtDate(d){return d.toLocaleDateString("en-GB",{day:"2-digit",month:"short",year:"numeric"});}
+function esc(s){return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");}
+
+function showAdminToast(msg, type="info") {
+  const c = document.getElementById("toast-container");
+  const icons = { success:"✅", error:"❌", info:"ℹ️" };
+  const el = document.createElement("div");
+  el.className = `toast ${type}`;
+  el.innerHTML = `<span>${icons[type]||""}</span><span>${msg}</span>`;
+  c.appendChild(el);
+  setTimeout(()=>el.remove(), 3200);
+}
+</script>
+</body>
+</html>
