@@ -4,14 +4,13 @@
    ============================================================ */
 
 // ─── 1. Firebase Config ─────────────────────────────────────────
-const FIREBASE_CONFIG = {
-  apiKey:            "YOUR_API_KEY",
-  authDomain:        "YOUR_PROJECT.firebaseapp.com",
-  projectId:         "YOUR_PROJECT_ID",
-  storageBucket:     "YOUR_PROJECT.appspot.com",
-  messagingSenderId: "YOUR_SENDER_ID",
-  appId:             "YOUR_APP_ID",
-  measurementId:     "YOUR_MEASUREMENT_ID"
+const firebaseConfig = {
+  apiKey: "AIzaSyDSZDP9Ji_kemfBTBr01MSiLAh1f6zJ6x4",
+  authDomain: "video-tube-4f290.firebaseapp.com",
+  projectId: "video-tube-4f290",
+  storageBucket: "video-tube-4f290.firebasestorage.app",
+  messagingSenderId: "549786848372",
+  appId: "1:549786848372:web:085029d034288a3e64d521"
 };
 
 // ─── 2. Initialise Firebase (compat SDK via CDN) ─────────────────
