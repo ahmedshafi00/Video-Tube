@@ -1,9 +1,17 @@
 /* ============================================================
    firebase.js — Firebase Config, Auth, Firestore helpers
-   Replace YOUR_* values with your actual Firebase project data
+
+   ⚠️  HOW TO SET YOUR FIREBASE CONFIG:
+   1. Go to https://console.firebase.google.com
+   2. Select your project → ⚙️ Project Settings → Your Apps
+   3. Click </> (Web) → Register app → copy the firebaseConfig
+   4. Paste the values below replacing each quoted string
    ============================================================ */
 
-// ─── 1. Firebase Config ─────────────────────────────────────────
+// ─── 1. Firebase Config — PASTE YOUR REAL VALUES HERE ────────────
+// Go to Firebase Console → Project Settings → Your Apps → Web App
+// Copy the firebaseConfig object and replace the values below:
+
 const firebaseConfig = {
   apiKey: "AIzaSyDSZDP9Ji_kemfBTBr01MSiLAh1f6zJ6x4",
   authDomain: "video-tube-4f290.firebaseapp.com",
